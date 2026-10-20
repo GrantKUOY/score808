@@ -22,7 +22,13 @@
         <p class="text-xs text-slate-500">國中三年定期評量・單科排名追蹤・會考模擬考總表</p>
       </div>
 
-      <div class="space-y-4">
+      <div id="tokenLoading" class="hidden text-center space-y-3 py-6">
+        <div class="inline-block w-10 h-10 border-4 border-blue-200 border-t-blue-900 rounded-full animate-spin"></div>
+        <p class="text-base font-bold text-slate-800">正在載入成績單…</p>
+        <p class="text-sm text-slate-500">約需 5～10 秒，請耐心等候，<br>不需要輸入任何帳號密碼。</p>
+      </div>
+
+      <div id="loginForm" class="space-y-4">
         <div>
           <label class="block text-xs font-bold text-slate-600 mb-1">1. 請輸入「學號」或「5碼班級座號」</label>
           <input type="text" id="loginAccount" inputmode="numeric" autocomplete="username" placeholder="例如：1140173 或 80801" class="w-full border border-slate-300 rounded-xl p-3 text-base font-mono bg-slate-50 focus:ring-2 focus:ring-blue-600">
@@ -213,9 +219,9 @@
 
     window.onload = function() {
       if (INITIAL_TOKEN) {
-        const btn = document.getElementById('btnLogin');
-        btn.disabled = true;
-        btn.innerText = '⏳ 專屬連結登入中...';
+        // 專屬連結：隱藏帳密欄位，只顯示載入提示
+        document.getElementById('loginForm').classList.add('hidden');
+        document.getElementById('tokenLoading').classList.remove('hidden');
         fetchReport({ token: INITIAL_TOKEN });
       }
     };
@@ -244,6 +250,9 @@
         document.getElementById('reportView').classList.remove('hidden');
         initReportView();
       } catch (err) {
+        // 載入失敗時才把登入欄位顯示回來
+        document.getElementById('tokenLoading').classList.add('hidden');
+        document.getElementById('loginForm').classList.remove('hidden');
         const btn = document.getElementById('btnLogin');
         btn.disabled = false;
         btn.innerText = '🔐 登入查看個人成績單';
@@ -255,6 +264,8 @@
       REPORT_DATA = null;
       AUTH = null;
       document.getElementById('loginPass').value = '';
+      document.getElementById('tokenLoading').classList.add('hidden');
+      document.getElementById('loginForm').classList.remove('hidden');
       document.getElementById('reportView').classList.add('hidden');
       document.getElementById('loginView').classList.remove('hidden');
       const btn = document.getElementById('btnLogin');
