@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>國中三年定期評量與模擬考 個人成績查詢系統</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; background-color: #f1f5f9; }
+    .tab-active { background-color: #1e3a8a; color: #ffffff; }
+  </style>
+</head>
+<body class="p-3 md:p-6 text-slate-800">
+
+  <div class="max-w-6xl mx-auto">
+    <!-- 登入區塊 -->
+    <div id="loginView" class="max-w-md mx-auto mt-10 bg-white p-6 md:p-8 rounded-2xl shadow-lg border border-slate-200">
+      <div class="text-center space-y-2 mb-6">
+        <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-900 text-white text-2xl font-bold shadow">🎓</div>
+        <h1 class="text-2xl font-bold text-slate-900">雲端個人成績查詢系統</h1>
+        <p class="text-xs text-slate-500">國中三年定期評量・單科排名追蹤・會考模擬考總表</p>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">1. 請輸入「學號」或「5碼班級座號」</label>
+          <input type="text" id="loginAccount" inputmode="numeric" autocomplete="username" placeholder="例如：1140173 或 80801" class="w-full border border-slate-300 rounded-xl p-3 text-base font-mono bg-slate-50 focus:ring-2 focus:ring-blue-600">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">2. 請輸入個人「4 碼通行碼」</label>
+          <input type="password" id="loginPass" inputmode="numeric" autocomplete="current-password" placeholder="請輸入導師發放的 4 碼數字" onkeydown="if(event.key==='Enter') doLogin()" class="w-full border border-slate-300 rounded-xl p-3 text-base font-mono tracking-widest bg-slate-50 focus:ring-2 focus:ring-blue-600">
+        </div>
+        <p id="loginError" class="text-xs text-rose-600 font-semibold min-h-[1rem]"></p>
+        <button onclick="doLogin()" id="btnLogin" class="w-full bg-blue-900 hover:bg-blue-800 text-white font-bold py-3 rounded-xl shadow transition">
+          🔐 登入查看個人成績單
+        </button>
+      </div>
+    </div>
+
+    <!-- 個人成績單主畫面 -->
+    <div id="reportView" class="hidden space-y-6">
+      <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 rounded-xl bg-blue-900 text-white flex items-center justify-center font-bold text-lg" id="stuSeatBadge">--</div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-xl font-bold text-slate-900" id="stuNameTitle">載入中...</h2>
+              <span id="stuRoleBadge" class="hidden text-xs bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full font-semibold">特殊生(不佔班排)</span>
+            </div>
+            <p class="text-xs text-slate-500 mt-0.5" id="stuSubInfo">「每一次的挫折，都是通往成功的階梯。」</p>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="switchTab('single')" id="tabBtn_single" class="px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 transition tab-active">
+            📄 單次段考與班五標對照
+          </button>
+          <button onclick="switchTab('history')" id="tabBtn_history" class="px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 transition">
+            📈 二三年級縱向總表 & 排名趨勢
+          </button>
+          <button onclick="switchTab('mock')" id="tabBtn_mock" class="px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 transition">
+            🏆 國三會考模擬考
+          </button>
+          <button onclick="logout()" class="px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-rose-600">
+            登出
+          </button>
+        </div>
+      </div>
+
+      <!-- 分頁 1 -->
+      <div id="view_single" class="space-y-6">
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-bold text-slate-700">📌 選擇定期評量次別：</span>
+              <select id="examSelector" onchange="renderSingleExam()" class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-bold bg-blue-50 text-blue-900"></select>
+            </div>
+            <span id="examPoolNote" class="text-xs text-slate-500"></span>
+          </div>
+          <div id="singleExamContent"></div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+            <h3 class="font-bold text-slate-800 text-sm mb-3">📊 本次段考【全班各科平均與五標人數分佈】對照表</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-center border-collapse text-xs">
+                <thead>
+                  <tr class="bg-slate-100 text-slate-600 border-b">
+                    <th class="p-2 text-left">分數組距 / 統計</th>
+                    <th class="p-2">國文</th>
+                    <th class="p-2">英語</th>
+                    <th class="p-2">數學</th>
+                    <th class="p-2">自然</th>
+                    <th class="p-2">社會</th>
+                    <th class="p-2 bg-blue-50 text-blue-900">五科平均</th>
+                  </tr>
+                </thead>
+                <tbody id="distTableBody" class="divide-y divide-slate-200 font-mono"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between space-y-4">
+            <div>
+              <h3 class="font-bold text-slate-800 text-sm border-b pb-2">✍️ 家長線上簽章與留言</h3>
+              <div id="signStatusBox" class="mt-3 text-xs"></div>
+            </div>
+            <div class="space-y-2.5 pt-2 border-t">
+              <input type="text" id="parentNameInput" maxlength="30" placeholder="家長簽名或稱謂 (如：王爸爸、李媽媽)" class="w-full border border-slate-300 rounded-lg p-2 text-base">
+              <textarea id="parentCommentInput" rows="2" maxlength="300" placeholder="給孩子的鼓勵或給導師的話 (選填)" class="w-full border border-slate-300 rounded-lg p-2 text-base"></textarea>
+              <button onclick="doParentSign()" id="btnSign" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg text-xs shadow transition">
+                ✅ 確認已閱本次成績並簽到
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 分頁 2 -->
+      <div id="view_history" class="hidden space-y-6">
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+            <h3 class="font-bold text-slate-800 text-base">📈 歷次定期評量【分數與班排名變化趨勢圖】</h3>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-slate-500">選擇檢視指標：</span>
+              <select id="chartMetricSelector" onchange="renderHistoryChart()" class="border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-bold bg-slate-50">
+                <option value="rank">各科與總分【班排名變化】(越上面名次越前)</option>
+                <option value="score">五科與總平均【分數變化】</option>
+              </select>
+            </div>
+          </div>
+          <div class="h-72 w-full">
+            <canvas id="trendChartCanvas"></canvas>
+          </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+          <div>
+            <h3 class="font-bold text-slate-800 text-base">📋 國中二、三年級定期評量縱向紀錄總表</h3>
+            <p class="text-xs text-slate-500">每個科目格子同時顯示「原始分數」與「(#該科班排)」，方便縱向追蹤單科強弱變化</p>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-center border-collapse text-xs">
+              <thead>
+                <tr class="bg-slate-800 text-white">
+                  <th class="p-2.5 text-left">學期段考次別</th>
+                  <th class="p-2.5">國文<br><span class="text-[10px] font-normal text-slate-300">分數 (班排)</span></th>
+                  <th class="p-2.5">英語<br><span class="text-[10px] font-normal text-slate-300">分數 (班排)</span></th>
+                  <th class="p-2.5">數學<br><span class="text-[10px] font-normal text-slate-300">分數 (班排)</span></th>
+                  <th class="p-2.5">自然<br><span class="text-[10px] font-normal text-slate-300">分數 (班排)</span></th>
+                  <th class="p-2.5">社會<br><span class="text-[10px] font-normal text-slate-300">分數 (班排)</span></th>
+                  <th class="p-2.5">作文<br><span class="text-[10px] font-normal text-slate-300">(級分)</span></th>
+                  <th class="p-2.5 bg-blue-900">五科總分</th>
+                  <th class="p-2.5 bg-blue-900">五科平均</th>
+                  <th class="p-2.5 bg-indigo-900">班名次<br><span class="text-[10px] font-normal text-indigo-200">(進步/退步)</span></th>
+                  <th class="p-2.5 bg-indigo-900">年名次<br><span class="text-[10px] font-normal text-indigo-200">(校排)</span></th>
+                  <th class="p-2.5">家長簽章</th>
+                </tr>
+              </thead>
+              <tbody id="longitudinalTableBody" class="divide-y divide-slate-200"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 分頁 3 -->
+      <div id="view_mock" class="hidden space-y-6">
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+          <div>
+            <h3 class="font-bold text-slate-800 text-base">🏆 國中教育會考模擬考成績總表 (第1~4次)</h3>
+            <p class="text-xs text-slate-500">「越努力越幸運，用汗水澆灌理想的未來。」</p>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-center border-collapse text-xs">
+              <thead>
+                <tr class="bg-purple-900 text-white">
+                  <th class="p-2.5 text-left">模擬考次別</th>
+                  <th class="p-2.5">項目</th>
+                  <th class="p-2.5">國文</th>
+                  <th class="p-2.5">英語</th>
+                  <th class="p-2.5">數學</th>
+                  <th class="p-2.5">自然</th>
+                  <th class="p-2.5">社會</th>
+                  <th class="p-2.5">寫作測驗</th>
+                  <th class="p-2.5 bg-purple-950">總計/積分</th>
+                  <th class="p-2.5 bg-purple-950">校/區排名</th>
+                </tr>
+              </thead>
+              <tbody id="mockTableBody" class="divide-y divide-slate-200"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ★ 改成你的 Apps Script「網頁應用程式」網址（結尾是 /exec）
+    const API_URL = 'https://script.google.com/macros/s/AKfycbw94nyl15itmln3rnFmeD0DIDP0q-tSg9Y3EE979zGF8teTIgJkRKW2QO1OuyWm8MUtGg/exec';
+
+    const INITIAL_TOKEN = new URLSearchParams(location.search).get('token') || '';
+    let REPORT_DATA = null;
+    let TREND_CHART = null;
+    let AUTH = null; // 登入憑證只存在記憶體，簽到時重新驗證
+
+    // 跳脫 HTML，避免留言夾帶程式碼
+    function esc(v) {
+      return String(v === null || v === undefined ? '' : v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    // 呼叫 Apps Script API（用 text/plain 避免跨網域預檢）
+    async function api(action, body) {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(Object.assign({ action }, body)),
+        redirect: 'follow'
+      });
+      if (!res.ok) throw new Error('伺服器連線失敗（' + res.status + '），請稍後再試。');
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || '發生未知錯誤');
+      return json.data;
+    }
+
+    window.onload = function() {
+      if (INITIAL_TOKEN) {
+        const btn = document.getElementById('btnLogin');
+        btn.disabled = true;
+        btn.innerText = '⏳ 專屬連結登入中...';
+        fetchReport({ token: INITIAL_TOKEN });
+      }
+    };
+
+    function doLogin() {
+      const acc = document.getElementById('loginAccount').value.trim();
+      const pass = document.getElementById('loginPass').value.trim();
+      const errEl = document.getElementById('loginError');
+      if (!acc || !pass) {
+        errEl.innerText = '⚠️ 請輸入學號(或5碼班座)與 4 碼通行碼！';
+        return;
+      }
+      errEl.innerText = '';
+      const btn = document.getElementById('btnLogin');
+      btn.disabled = true;
+      btn.innerText = '⏳ 正在定位班級試算表並計算排名...';
+      fetchReport({ account: acc, passcode: pass });
+    }
+
+    async function fetchReport(auth) {
+      try {
+        const data = await api('report', { auth });
+        AUTH = auth;
+        REPORT_DATA = data;
+        document.getElementById('loginView').classList.add('hidden');
+        document.getElementById('reportView').classList.remove('hidden');
+        initReportView();
+      } catch (err) {
+        const btn = document.getElementById('btnLogin');
+        btn.disabled = false;
+        btn.innerText = '🔐 登入查看個人成績單';
+        document.getElementById('loginError').innerText = '❌ ' + (err.message || err);
+      }
+    }
+
+    function logout() {
+      REPORT_DATA = null;
+      AUTH = null;
+      document.getElementById('loginPass').value = '';
+      document.getElementById('reportView').classList.add('hidden');
+      document.getElementById('loginView').classList.remove('hidden');
+      const btn = document.getElementById('btnLogin');
+      btn.disabled = false;
+      btn.innerText = '🔐 登入查看個人成績單';
+      // 清掉網址上的 token，避免登出後重新整理又自動登入
+      if (location.search) history.replaceState(null, '', location.pathname);
+    }
+
+    function switchTab(tabName) {
+      ['single', 'history', 'mock'].forEach(t => {
+        document.getElementById('view_' + t).classList.toggle('hidden', t !== tabName);
+        const btn = document.getElementById('tabBtn_' + t);
+        btn.className = (t === tabName)
+          ? 'px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 transition tab-active'
+          : 'px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 transition';
+      });
+      if (tabName === 'history') renderHistoryChart();
+    }
+
+    function initReportView() {
+      const stu = REPORT_DATA.student;
+      document.getElementById('stuSeatBadge').innerText = String(stu.seat).padStart(2, '0');
+      document.getElementById('stuNameTitle').innerText = `${REPORT_DATA.classTitle} ${stu.seat}號 ${stu.name} (${stu.stuId})`;
+      document.getElementById('stuRoleBadge').classList.toggle('hidden', stu.role !== '特殊生');
+
+      const sel = document.getElementById('examSelector');
+      sel.innerHTML = REPORT_DATA.exams.map(ex => {
+        const tag = ex.hasData ? '✓ 已公布' : '(尚無成績)';
+        return `<option value="${esc(ex.id)}">【${esc(ex.id)}】${esc(ex.title)} ${tag}</option>`;
+      }).join('');
+
+      const latestWithData = [...REPORT_DATA.exams].reverse().find(ex => ex.hasData);
+      if (latestWithData) sel.value = latestWithData.id;
+
+      renderSingleExam();
+      renderLongitudinalTable();
+      renderMockTable();
+    }
+
+    function renderSingleExam() {
+      const exId = document.getElementById('examSelector').value;
+      const ex = REPORT_DATA.exams.find(e => e.id === exId);
+      const container = document.getElementById('singleExamContent');
+      document.getElementById('examPoolNote').innerText = ex ? `本班一般生採計排名人數：${ex.regularCount} 人` : '';
+
+      if (!ex || !ex.hasData || !ex.myData) {
+        container.innerHTML = `<div class="p-8 text-center text-slate-400 bg-slate-50 rounded-xl">本次段考（${ex ? esc(ex.title) : ''}）尚無成績紀錄</div>`;
+      } else {
+        const d = ex.myData;
+        const subCards = REPORT_DATA.subjects.map(sub => {
+          const val = d.scores[sub.key];
+          const sRank = d.subjRanks[sub.key];
+          const clsAvg = ex.classStats[sub.key] ? ex.classStats[sub.key].avg : '-';
+          const isLow = val !== null && val < 60;
+          return `<div class="p-3.5 rounded-xl border ${isLow ? 'bg-rose-50/60 border-rose-200' : 'bg-slate-50 border-slate-200'} text-center space-y-1">
+            <div class="text-xs font-bold text-slate-500">${esc(sub.name)}</div>
+            <div class="text-2xl font-extrabold font-mono ${isLow ? 'text-rose-600' : 'text-slate-900'}">${val !== null ? val : '-'}</div>
+            <div class="flex items-center justify-center gap-1.5 text-[11px]">
+              <span class="bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-600 font-semibold">班排: ${sRank || '-'}</span>
+              <span class="text-slate-400">班均: ${clsAvg}</span>
+            </div>
+          </div>`;
+        }).join('');
+
+        let changeBadge = '';
+        if (d.rankChange !== null && d.rankChange !== 0) {
+          changeBadge = d.rankChange > 0
+            ? `<span class="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">▲ 進步 ${d.rankChange} 名</span>`
+            : `<span class="text-xs bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full font-bold">▼ 退步 ${Math.abs(d.rankChange)} 名</span>`;
+        }
+
+        container.innerHTML = `
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+            ${subCards}
+            <div class="p-3.5 rounded-xl border bg-amber-50/60 border-amber-200 text-center space-y-1">
+              <div class="text-xs font-bold text-amber-800">作文 (級分)</div>
+              <div class="text-2xl font-extrabold font-mono text-amber-900">${esc(d.essay)}</div>
+              <div class="text-[11px] text-amber-700">不計入五科總分</div>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+            <div class="p-4 rounded-xl bg-blue-900 text-white text-center">
+              <div class="text-xs text-blue-200">五科總分</div>
+              <div class="text-2xl font-extrabold font-mono mt-0.5">${d.sum5}</div>
+            </div>
+            <div class="p-4 rounded-xl bg-blue-800 text-white text-center">
+              <div class="text-xs text-blue-200">五科平均 (班均 ${ex.classStats.avg.avg})</div>
+              <div class="text-2xl font-extrabold font-mono mt-0.5">${d.avg5}</div>
+            </div>
+            <div class="p-4 rounded-xl bg-indigo-900 text-white text-center">
+              <div class="text-xs text-indigo-200">班級名次</div>
+              <div class="flex items-center justify-center gap-2 mt-0.5">
+                <span class="text-2xl font-extrabold font-mono">${esc(d.classRank)}</span>
+                ${changeBadge}
+              </div>
+            </div>
+            <div class="p-4 rounded-xl bg-slate-800 text-white text-center">
+              <div class="text-xs text-slate-300">年名次 (校排)</div>
+              <div class="text-2xl font-extrabold font-mono mt-0.5">${esc(d.schoolRank)}</div>
+            </div>
+          </div>
+          ${d.comment ? `<div class="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900">💬 <b>導師評語：</b>${esc(d.comment)}</div>` : ''}
+        `;
+      }
+
+      const distRows = [
+        { label: '90 ~ 100 分 (人數)', key: 'b90' },
+        { label: '80 ~ 89 分 (人數)', key: 'b80' },
+        { label: '70 ~ 79 分 (人數)', key: 'b70' },
+        { label: '60 ~ 69 分 (人數)', key: 'b60' },
+        { label: '0 ~ 59 分 (人數)', key: 'b0' },
+        { label: '全班平均分數', key: 'avg', bold: true },
+        { label: '全班標準差', key: 'std' }
+      ];
+      const keys = ['chi', 'eng', 'math', 'sci', 'soc', 'avg'];
+      document.getElementById('distTableBody').innerHTML = distRows.map(r => {
+        const tds = keys.map(k => {
+          const val = ex && ex.classStats && ex.classStats[k] ? ex.classStats[k][r.key] : '-';
+          return `<td class="p-2 ${r.bold ? 'font-bold text-blue-900 bg-blue-50/50' : ''}">${val}</td>`;
+        }).join('');
+        return `<tr><td class="p-2 text-left font-sans font-medium text-slate-700">${r.label}</td>${tds}</tr>`;
+      }).join('');
+
+      const signBox = document.getElementById('signStatusBox');
+      if (ex && ex.signature) {
+        signBox.innerHTML = `<div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 space-y-1">
+          <div class="font-bold">✅ 已完成線上簽閱 (${esc(ex.signature.time)})</div>
+          <div>簽章人：${esc(ex.signature.parentName)}</div>
+          ${ex.signature.comment ? `<div>留言：${esc(ex.signature.comment)}</div>` : ''}
+        </div>`;
+      } else {
+        signBox.innerHTML = `<div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800">
+          ⏳ 本次段考成績單尚未簽閱，請家長檢視後於下方簽名確認。
+        </div>`;
+      }
+    }
+
+    function renderLongitudinalTable() {
+      const tbody = document.getElementById('longitudinalTableBody');
+      tbody.innerHTML = REPORT_DATA.exams.map(ex => {
+        if (!ex.hasData || !ex.myData) {
+          return `<tr class="text-slate-300">
+            <td class="p-2.5 text-left font-semibold text-slate-500">【${esc(ex.id)}】${esc(ex.title)}</td>
+            <td colspan="11" class="p-2.5 text-center">尚無成績紀錄</td>
+          </tr>`;
+        }
+        const d = ex.myData;
+        const subCells = REPORT_DATA.subjects.map(sub => {
+          const sc = d.scores[sub.key];
+          const rk = d.subjRanks[sub.key];
+          if (sc === null) return `<td class="p-2.5">-</td>`;
+          return `<td class="p-2.5 font-mono">
+            <span class="font-bold text-sm ${sc < 60 ? 'text-rose-600' : 'text-slate-800'}">${sc}</span>
+            ${rk ? `<span class="text-[11px] text-slate-400 ml-0.5">(#${rk})</span>` : ''}
+          </td>`;
+        }).join('');
+
+        let diffHtml = '';
+        if (d.rankChange !== null && d.rankChange !== 0) {
+          diffHtml = d.rankChange > 0
+            ? `<span class="text-[10px] text-emerald-600 font-bold ml-1">(▲${d.rankChange})</span>`
+            : `<span class="text-[10px] text-rose-600 font-bold ml-1">(▼${Math.abs(d.rankChange)})</span>`;
+        }
+
+        const signBadge = ex.signature
+          ? `<span class="text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">✓ ${esc(ex.signature.parentName)}</span>`
+          : `<span class="text-[11px] text-slate-400">未簽閱</span>`;
+
+        return `<tr class="hover:bg-slate-50">
+          <td class="p-2.5 text-left font-bold text-slate-800">【${esc(ex.id)}】${esc(ex.title)}</td>
+          ${subCells}
+          <td class="p-2.5 font-mono font-bold text-amber-800">${esc(d.essay)}</td>
+          <td class="p-2.5 font-mono font-bold text-blue-900 bg-blue-50/40">${d.sum5}</td>
+          <td class="p-2.5 font-mono font-bold text-blue-900 bg-blue-50/40">${d.avg5}</td>
+          <td class="p-2.5 font-mono font-bold text-indigo-900 bg-indigo-50/40">${esc(d.classRank)}${diffHtml}</td>
+          <td class="p-2.5 font-mono font-bold text-slate-700">${esc(d.schoolRank)}</td>
+          <td class="p-2.5">${signBadge}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderHistoryChart() {
+      const mode = document.getElementById('chartMetricSelector').value;
+      const validExams = REPORT_DATA.exams.filter(e => e.hasData && e.myData);
+      const labels = validExams.map(e => e.id);
+      const colors = {
+        chi: '#ef4444', eng: '#f59e0b', math: '#3b82f6', sci: '#10b981', soc: '#8b5cf6', total: '#0f172a'
+      };
+
+      const datasets = REPORT_DATA.subjects.map(sub => ({
+        label: sub.name,
+        data: validExams.map(e => mode === 'rank' ? (e.myData.subjRanks[sub.key] || null) : e.myData.scores[sub.key]),
+        borderColor: colors[sub.key],
+        backgroundColor: colors[sub.key],
+        tension: 0.25,
+        borderWidth: 2
+      }));
+
+      datasets.push({
+        label: mode === 'rank' ? '五科總分班排' : '五科平均分數',
+        data: validExams.map(e => mode === 'rank' ? (typeof e.myData.classRank === 'number' ? e.myData.classRank : null) : e.myData.avg5),
+        borderColor: colors.total,
+        backgroundColor: colors.total,
+        borderWidth: 3,
+        borderDash: [5, 5],
+        tension: 0.25
+      });
+
+      const ctx = document.getElementById('trendChartCanvas').getContext('2d');
+      if (TREND_CHART) TREND_CHART.destroy();
+      TREND_CHART = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              reverse: mode === 'rank',
+              min: mode === 'rank' ? 1 : 0,
+              max: mode === 'rank' ? undefined : 100,
+              title: { display: true, text: mode === 'rank' ? '班級名次 (越上方越優)' : '分數' }
+            }
+          }
+        }
+      });
+    }
+
+    function renderMockTable() {
+      const tbody = document.getElementById('mockTableBody');
+      tbody.innerHTML = REPORT_DATA.mocks.map(m => `
+        <tr class="border-t-2 border-slate-300">
+          <td rowspan="2" class="p-2.5 text-left font-bold text-slate-900 bg-slate-50">${esc(m.title)}</td>
+          <td class="p-2 font-semibold text-purple-900 bg-purple-50/40">級分</td>
+          <td class="p-2 font-mono font-bold">${esc(m.chi.level)}</td>
+          <td class="p-2 font-mono font-bold">${esc(m.eng.level)}</td>
+          <td class="p-2 font-mono font-bold">${esc(m.math.level)}</td>
+          <td class="p-2 font-mono font-bold">${esc(m.sci.level)}</td>
+          <td class="p-2 font-mono font-bold">${esc(m.soc.level)}</td>
+          <td rowspan="2" class="p-2 font-mono font-bold text-amber-800">${esc(m.essay)}</td>
+          <td rowspan="2" class="p-2 font-mono font-extrabold text-purple-900 bg-purple-50/50 text-sm">${esc(m.totalPts)}</td>
+          <td rowspan="2" class="p-2 font-mono font-extrabold text-indigo-900 bg-indigo-50/50 text-sm">${esc(m.areaRank)}</td>
+        </tr>
+        <tr>
+          <td class="p-2 font-semibold text-slate-500 bg-slate-50">點數</td>
+          <td class="p-2 font-mono text-slate-600">${esc(m.chi.pts)}</td>
+          <td class="p-2 font-mono text-slate-600">${esc(m.eng.pts)}</td>
+          <td class="p-2 font-mono text-slate-600">${esc(m.math.pts)}</td>
+          <td class="p-2 font-mono text-slate-600">${esc(m.sci.pts)}</td>
+          <td class="p-2 font-mono text-slate-600">${esc(m.soc.pts)}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function doParentSign() {
+      const exId = document.getElementById('examSelector').value;
+      const parentName = document.getElementById('parentNameInput').value.trim() || '家長已閱';
+      const comment = document.getElementById('parentCommentInput').value.trim();
+      const btn = document.getElementById('btnSign');
+      btn.disabled = true;
+      btn.innerText = '⏳ 正在寫入簽章...';
+
+      try {
+        const res = await api('sign', { auth: AUTH, examId: exId, parentName, comment });
+        btn.disabled = false;
+        btn.innerText = '✅ 已成功完成簽閱！';
+        const ex = REPORT_DATA.exams.find(e => e.id === exId);
+        if (ex) ex.signature = res;
+        renderSingleExam();
+        renderLongitudinalTable();
+        document.getElementById('parentCommentInput').value = '';
+        setTimeout(() => { btn.innerText = '✅ 確認已閱本次成績並簽到'; }, 3000);
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerText = '✅ 確認已閱本次成績並簽到';
+        alert('簽到失敗：' + (err.message || err));
+      }
+    }
+  </script>
+</body>
+</html>
