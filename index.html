@@ -81,8 +81,8 @@
           <div id="singleExamContent"></div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div class="lg:col-span-2 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+        <div>
+          <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
             <h3 class="font-bold text-slate-800 text-sm mb-3">📊 本次段考【全班各科平均與五標人數分佈】對照表</h3>
             <div class="overflow-x-auto">
               <table class="w-full text-center border-collapse text-xs">
@@ -99,20 +99,6 @@
                 </thead>
                 <tbody id="distTableBody" class="divide-y divide-slate-200 font-mono"></tbody>
               </table>
-            </div>
-          </div>
-
-          <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between space-y-4">
-            <div>
-              <h3 class="font-bold text-slate-800 text-sm border-b pb-2">✍️ 家長線上簽章與留言</h3>
-              <div id="signStatusBox" class="mt-3 text-xs"></div>
-            </div>
-            <div class="space-y-2.5 pt-2 border-t">
-              <input type="text" id="parentNameInput" maxlength="30" placeholder="家長簽名或稱謂 (如：王爸爸、李媽媽)" class="w-full border border-slate-300 rounded-lg p-2 text-base">
-              <textarea id="parentCommentInput" rows="2" maxlength="300" placeholder="給孩子的鼓勵或給導師的話 (選填)" class="w-full border border-slate-300 rounded-lg p-2 text-base"></textarea>
-              <button onclick="doParentSign()" id="btnSign" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg text-xs shadow transition">
-                ✅ 確認已閱本次成績並簽到
-              </button>
             </div>
           </div>
         </div>
@@ -156,7 +142,6 @@
                   <th class="p-2.5 bg-blue-900">五科平均</th>
                   <th class="p-2.5 bg-indigo-900">班名次<br><span class="text-[10px] font-normal text-indigo-200">(進步/退步)</span></th>
                   <th class="p-2.5 bg-indigo-900">年名次<br><span class="text-[10px] font-normal text-indigo-200">(校排)</span></th>
-                  <th class="p-2.5">家長簽章</th>
                 </tr>
               </thead>
               <tbody id="longitudinalTableBody" class="divide-y divide-slate-200"></tbody>
@@ -393,19 +378,6 @@
         }).join('');
         return `<tr><td class="p-2 text-left font-sans font-medium text-slate-700">${r.label}</td>${tds}</tr>`;
       }).join('');
-
-      const signBox = document.getElementById('signStatusBox');
-      if (ex && ex.signature) {
-        signBox.innerHTML = `<div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 space-y-1">
-          <div class="font-bold">✅ 已完成線上簽閱 (${esc(ex.signature.time)})</div>
-          <div>簽章人：${esc(ex.signature.parentName)}</div>
-          ${ex.signature.comment ? `<div>留言：${esc(ex.signature.comment)}</div>` : ''}
-        </div>`;
-      } else {
-        signBox.innerHTML = `<div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800">
-          ⏳ 本次段考成績單尚未簽閱，請家長檢視後於下方簽名確認。
-        </div>`;
-      }
     }
 
     function renderLongitudinalTable() {
@@ -414,7 +386,7 @@
         if (!ex.hasData || !ex.myData) {
           return `<tr class="text-slate-300">
             <td class="p-2.5 text-left font-semibold text-slate-500">【${esc(ex.id)}】${esc(ex.title)}</td>
-            <td colspan="11" class="p-2.5 text-center">尚無成績紀錄</td>
+            <td colspan="10" class="p-2.5 text-center">尚無成績紀錄</td>
           </tr>`;
         }
         const d = ex.myData;
@@ -435,10 +407,6 @@
             : `<span class="text-[10px] text-rose-600 font-bold ml-1">(▼${Math.abs(d.rankChange)})</span>`;
         }
 
-        const signBadge = ex.signature
-          ? `<span class="text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">✓ ${esc(ex.signature.parentName)}</span>`
-          : `<span class="text-[11px] text-slate-400">未簽閱</span>`;
-
         return `<tr class="hover:bg-slate-50">
           <td class="p-2.5 text-left font-bold text-slate-800">【${esc(ex.id)}】${esc(ex.title)}</td>
           ${subCells}
@@ -447,7 +415,6 @@
           <td class="p-2.5 font-mono font-bold text-blue-900 bg-blue-50/40">${d.avg5}</td>
           <td class="p-2.5 font-mono font-bold text-indigo-900 bg-indigo-50/40">${esc(d.classRank)}${diffHtml}</td>
           <td class="p-2.5 font-mono font-bold text-slate-700">${esc(d.schoolRank)}</td>
-          <td class="p-2.5">${signBadge}</td>
         </tr>`;
       }).join('');
     }
@@ -525,30 +492,6 @@
       `).join('');
     }
 
-    async function doParentSign() {
-      const exId = document.getElementById('examSelector').value;
-      const parentName = document.getElementById('parentNameInput').value.trim() || '家長已閱';
-      const comment = document.getElementById('parentCommentInput').value.trim();
-      const btn = document.getElementById('btnSign');
-      btn.disabled = true;
-      btn.innerText = '⏳ 正在寫入簽章...';
-
-      try {
-        const res = await api('sign', { auth: AUTH, examId: exId, parentName, comment });
-        btn.disabled = false;
-        btn.innerText = '✅ 已成功完成簽閱！';
-        const ex = REPORT_DATA.exams.find(e => e.id === exId);
-        if (ex) ex.signature = res;
-        renderSingleExam();
-        renderLongitudinalTable();
-        document.getElementById('parentCommentInput').value = '';
-        setTimeout(() => { btn.innerText = '✅ 確認已閱本次成績並簽到'; }, 3000);
-      } catch (err) {
-        btn.disabled = false;
-        btn.innerText = '✅ 確認已閱本次成績並簽到';
-        alert('簽到失敗：' + (err.message || err));
-      }
-    }
   </script>
 </body>
 </html>
